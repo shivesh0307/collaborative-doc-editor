@@ -16,7 +16,13 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        // Raw WebSocket endpoint
         registry.addHandler(handler, "/ws")
+                .addInterceptors(new DocIdHandshakeInterceptor())
+                .setAllowedOrigins("*");
+        
+        // SockJS fallback endpoint  
+        registry.addHandler(handler, "/ws-sockjs")
                 .addInterceptors(new DocIdHandshakeInterceptor())
                 .setAllowedOrigins("*")
                 .withSockJS();

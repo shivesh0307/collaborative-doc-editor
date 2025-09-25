@@ -1,42 +1,768 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
+/* Google Docs Style UI */
+
+/* Global Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Google Sans', 'Roboto', 'Arial', sans-serif;
+  background: #f9f9fb;
+}
+
+/* Home Page */
+.home {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #4285f4 0%, #34a853 50%, #fbbc05 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 2rem;
+}
+
+.container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 3rem;
+  width: 100%;
+  max-width: 500px;
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.home-header {
+  margin-bottom: 2rem;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+.app-title {
+  font-size: 2rem;
+  font-weight: 400;
+  color: #202124;
+  margin: 0 0 0.5rem 0;
+}
+
+.app-subtitle {
+  color: #5f6368;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.home-main {
+  margin-bottom: 2rem;
+}
+
+.create-doc {
+  margin-bottom: 2rem;
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.doc-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: 'Google Sans', sans-serif;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.doc-input:focus {
+  outline: none;
+  border-color: #4285f4;
+  box-shadow: 0 1px 6px rgba(66, 133, 244, 0.28);
+}
+
+.create-btn {
+  padding: 12px 24px;
+  background: #4285f4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.create-btn:hover:not(:disabled) {
+  background: #3367d6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.create-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quick-start {
+  text-align: left;
+}
+
+.quick-title {
+  color: #3c4043;
+  font-weight: 500;
+  margin: 0 0 12px 0;
+  font-size: 14px;
+}
+
+.quick-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-doc {
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border: 1px solid #dadce0;
+  border-radius: 16px;
+  color: #3c4043;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-doc:hover {
+  background: #e8f0fe;
+  border-color: #4285f4;
+}
+
+.home-footer {
+  border-top: 1px solid #e8eaed;
+  padding-top: 1.5rem;
+  color: #5f6368;
+  font-size: 13px;
+}
+
+.home-footer p {
+  margin: 0;
+}
+
+/* Google Docs Editor Interface */
+.editor {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f9f9fb;
+  font-family: 'Google Sans', 'Roboto', sans-serif;
+}
+
+/* Header - Google Docs Style */
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  background: white;
+  border-bottom: 1px solid #e8eaed;
+  min-height: 64px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  color: #5f6368;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: 'Google Sans', sans-serif;
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  background: #f8f9fa;
+  border-color: #4285f4;
+  color: #4285f4;
+}
+
+.doc-title {
+  font-size: 18px;
+  font-weight: 400;
+  color: #202124;
+  margin: 0;
+  border: none;
+  background: transparent;
+  padding: 8px 0;
+  outline: none;
+  min-width: 200px;
+}
+
+.doc-title:focus {
+  background: #f8f9fa;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.word-count {
+  color: #5f6368;
+  font-size: 13px;
+}
+
+.status-dot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #5f6368;
+}
+
+.status-dot .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ea4335;
+}
+
+.status-dot.connected .dot {
+  background: #34a853;
+}
+
+.status-dot.disconnected .dot {
+  background: #ea4335;
+}
+
+.status-dot.error .dot {
+  background: #fbbc05;
+}
+
+/* Toolbar - Google Docs Style */
+.toolbar {
+  display: flex;
+  align-items: center;
+  padding: 8px 24px;
+  background: white;
+  border-bottom: 1px solid #e8eaed;
+  gap: 4px;
+}
+
+.format-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3c4043;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.format-btn:hover {
+  background: #f1f3f4;
+}
+
+.format-btn.active {
+  background: #e8f0fe;
+  color: #1a73e8;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: #dadce0;
+  margin: 0 8px;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.share-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.share-btn:hover {
+  background: #1557b8;
+}
+
+/* Editor Content - Document Style */
+.editor-content {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+  background: #f9f9fb;
+}
+
+.editor-wrapper {
+  width: 100%;
+  max-width: 816px; /* 8.5" at 96 DPI */
+  background: white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  min-height: 1056px; /* 11" at 96 DPI */
+}
+
+.editor-textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 1056px;
+  border: none;
+  outline: none;
+  padding: 96px; /* 1" margins */
+  font-size: 11pt;
+  line-height: 1.15;
+  font-family: 'Times New Roman', serif;
+  background: white;
+  resize: none;
+  color: #202124;
+}
+
+.editor-textarea::placeholder {
+  color: #9aa0a6;
+}
+
+/* Status Bar */
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 24px;
+  background: white;
+  border-top: 1px solid #e8eaed;
+  font-size: 12px;
+  color: #5f6368;
+}
+
+.status-info {
+  display: flex;
+  gap: 16px;
+}
+
+.pending-info {
+  color: #fbbc05;
+  font-weight: 500;
+}
+
+/* Error Page */
+.error-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #f9f9fb;
+  padding: 2rem;
+}
+
+.error-card {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+}
+
+.error-card h2 {
+  color: #ea4335;
+  margin-bottom: 1rem;
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.error-card p {
+  color: #5f6368;
+  margin-bottom: 1.5rem;
+  font-size: 14px;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .editor-wrapper {
+    margin: 0;
+    box-shadow: none;
+    border-radius: 0;
   }
-  to {
-    transform: rotate(360deg);
+  
+  .editor-textarea {
+    padding: 48px 24px;
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+@media (max-width: 768px) {
+  .container {
+    padding: 2rem;
+    margin: 1rem;
+  }
+  
+  .app-title {
+    font-size: 1.75rem;
+  }
+  
+  .input-group {
+    flex-direction: column;
+  }
+  
+  .quick-docs {
+    justify-content: center;
+  }
+  
+  .editor-header {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .header-left {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .doc-title {
+    font-size: 16px;
+    min-width: 150px;
+  }
+  
+  .toolbar {
+    padding: 8px 16px;
+    overflow-x: auto;
+  }
+  
+  .editor-content {
+    padding: 16px 8px;
+  }
+  
+  .editor-textarea {
+    padding: 24px 16px;
+    min-height: calc(100vh - 200px);
+  }
+  
+  .status-bar {
+    padding: 8px 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .status-info {
+    flex-direction: column;
+    gap: 4px;
   }
 }
 
-.card {
-  padding: 2em;
+@media (max-width: 480px) {
+  .container {
+    padding: 1.5rem;
+  }
+  
+  .app-title {
+    font-size: 1.5rem;
+  }
+  
+  .editor-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .header-left,
+  .header-right {
+    justify-content: space-between;
+  }
+  
+  .toolbar {
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+  
+  .editor-content {
+    padding: 8px;
+  }
+  
+  .editor-textarea {
+    padding: 16px;
+    min-height: calc(100vh - 220px);
+  }
 }
 
-.read-the-docs {
-  color: #888;
+/* Print Styles */
+@media print {
+  .editor-header,
+  .toolbar,
+  .status-bar {
+    display: none !important;
+  }
+  
+  .editor-content {
+    padding: 0;
+    background: white;
+  }
+  
+  .editor-wrapper {
+    box-shadow: none;
+    max-width: none;
+  }
+  
+  .editor-textarea {
+    background: white;
+    color: black;
+    min-height: auto;
+  }
+}
+
+/* Focus and Selection States */
+.editor-textarea:focus {
+  outline: none;
+}
+
+/* Custom scrollbar for webkit browsers */
+.editor-content::-webkit-scrollbar {
+  width: 12px;
+}
+
+.editor-content::-webkit-scrollbar-track {
+  background: #f1f3f4;
+}
+
+.editor-content::-webkit-scrollbar-thumb {
+  background: #dadce0;
+  border-radius: 6px;
+}
+
+.editor-content::-webkit-scrollbar-thumb:hover {
+  background: #bdc1c6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    padding: 2rem;
+    margin: 1rem;
+  }
+  
+  .app-title {
+    font-size: 2rem;
+  }
+  
+  .input-group {
+    flex-direction: column;
+  }
+  
+  .quick-docs {
+    justify-content: center;
+  }
+  
+  .editor-header {
+    padding: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .header-left,
+  .header-right {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .doc-title {
+    font-size: 1.125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .toolbar {
+    padding: 0.5rem 1rem;
+    overflow-x: auto;
+  }
+  
+  .editor-content {
+    padding: 1rem;
+  }
+  
+  .editor-textarea {
+    padding: 1.5rem;
+    font-size: 1rem;
+    min-height: calc(100vh - 220px);
+  }
+  
+  .status-bar {
+    padding: 0.5rem 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .status-info {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 1.5rem;
+  }
+  
+  .app-title {
+    font-size: 1.75rem;
+  }
+  
+  .editor-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .header-left,
+  .header-right {
+    justify-content: space-between;
+  }
+  
+  .toolbar {
+    flex-wrap: wrap;
+  }
+  
+  .editor-content {
+    padding: 0.75rem;
+  }
+  
+  .editor-textarea {
+    padding: 1rem;
+    min-height: calc(100vh - 240px);
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .container {
+    background: #1a202c;
+    color: #e2e8f0;
+  }
+  
+  .app-title {
+    color: #e2e8f0;
+  }
+  
+  .app-subtitle {
+    color: #a0aec0;
+  }
+  
+  .doc-input {
+    background: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+  }
+  
+  .doc-input:focus {
+    border-color: #667eea;
+  }
+  
+  .quick-doc {
+    background: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+  }
+  
+  .quick-doc:hover {
+    background: #4a5568;
+  }
+  
+  .home-footer {
+    border-color: #4a5568;
+    color: #718096;
+  }
+  
+  .editor {
+    background: #1a202c;
+  }
+  
+  .editor-header,
+  .toolbar,
+  .status-bar {
+    background: #2d3748;
+    border-color: #4a5568;
+  }
+  
+  .doc-title {
+    color: #e2e8f0;
+  }
+  
+  .back-btn {
+    background: #4a5568;
+    color: #e2e8f0;
+  }
+  
+  .back-btn:hover {
+    background: #718096;
+  }
+  
+  .format-btn:hover {
+    background: #4a5568;
+  }
+  
+  .editor-textarea {
+    background: #2d3748;
+    color: #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .word-count,
+  .status-info {
+    color: #a0aec0;
+  }
+  
+  .error-card {
+    background: #2d3748;
+    color: #e2e8f0;
+  }
+}
+
+/* Print styles */
+@media print {
+  .editor-header,
+  .toolbar,
+  .status-bar {
+    display: none !important;
+  }
+  
+  .editor-content {
+    padding: 0;
+  }
+  
+  .editor-textarea {
+    box-shadow: none;
+    border: none;
+    background: white;
+    color: black;
+  }
 }

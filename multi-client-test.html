@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multi-Client Collaborative Editor Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 10px; 
+            background: #f8f9fa; 
+            margin: 0;
+        }
+        .header {
+            background: #343a40;
+            color: white;
+            padding: 15px;
+            margin: -10px -10px 20px -10px;
+            text-align: center;
+        }
+        .controls {
+            background: white;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .clients-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .client {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .client-header {
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .client-title { font-weight: bold; color: #495057; }
+        .client-config {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-size: 12px;
+        }
+        .client-config input, .client-config select {
+            padding: 4px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-bar {
+            padding: 8px 15px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-connected { background: #d4edda; color: #155724; }
+        .status-disconnected { background: #f8d7da; color: #721c24; }
+        .status-connecting { background: #fff3cd; color: #856404; }
+        .server-info {
+            font-size: 11px;
+            color: #6c757d;
+        }
+        .client-content {
+            padding: 15px;
+        }
+        .editor {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        .client-controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+        }
+        .btn {
+            padding: 6px 12px;
+            border: 1px solid #007bff;
+            background: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn:hover { background: #0056b3; }
+        .btn-secondary {
+            background: #6c757d;
+            border-color: #6c757d;
+        }
+        .btn-secondary:hover { background: #545b62; }
+        .btn-danger {
+            background: #dc3545;
+            border-color: #dc3545;
+        }
+        .btn-danger:hover { background: #c82333; }
+        .log-container {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .log-header {
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .log {
+            height: 250px;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .log-entry {
+            margin-bottom: 4px;
+            padding: 2px 0;
+            border-left: 3px solid transparent;
+            padding-left: 8px;
+        }
+        .log-info { border-left-color: #17a2b8; }
+        .log-success { border-left-color: #28a745; color: #155724; }
+        .log-error { border-left-color: #dc3545; color: #721c24; }
+        .log-warning { border-left-color: #ffc107; color: #856404; }
+        .client-stats {
+            font-size: 11px;
+            color: #6c757d;
+            margin-top: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Multi-Client Collaborative Editor Test</h1>
+        <p>Test conflict resolution, server routing, and real-time collaboration</p>
+    </div>
+
+    <div class="controls">
+        <div>
+            <label><strong>Global Controls:</strong></label>
+            <button class="btn" onclick="connectAll()">Connect All</button>
+            <button class="btn btn-secondary" onclick="disconnectAll()">Disconnect All</button>
+            <button class="btn btn-secondary" onclick="testConnection()">Test Connection</button>
+            <button class="btn btn-danger" onclick="clearAllLogs()">Clear Logs</button>
+        </div>
+        <div>
+            <label><strong>Auto-sync:</strong></label>
+            <input type="checkbox" id="autoSync" checked> Enable
+            <label style="margin-left: 15px;"><strong>Debounce:</strong></label>
+            <input type="number" id="debounceMs" value="300" min="100" max="2000" style="width: 80px;"> ms
+        </div>
+    </div>
+
+    <div class="clients-container">
+        <!-- Client 1 -->
+        <div class="client" id="client1">
+            <div class="client-header">
+                <div class="client-title">Client 1</div>
+                <div class="client-config">
+                    <label>Doc:</label>
+                    <input type="text" id="docId1" value="test-doc-1" placeholder="Document ID">
+                    <label>Server:</label>
+                    <select id="serverHint1">
+                        <option value="">Auto (Load Balanced)</option>
+                        <option value="app1">Force app1</option>
+                        <option value="app2">Force app2</option>
+                        <option value="app3">Force app3</option>
+                    </select>
+                </div>
+            </div>
+            <div class="status-bar status-disconnected" id="status1">
+                <span>Status: Disconnected</span>
+                <span class="server-info" id="serverInfo1">Server: None</span>
+            </div>
+            <div class="client-content">
+                <textarea class="editor" id="editor1" placeholder="Client 1: Start typing to test collaboration..."></textarea>
+                <div class="client-controls">
+                    <button class="btn" onclick="connect(1)">Connect</button>
+                    <button class="btn btn-secondary" onclick="disconnect(1)">Disconnect</button>
+                    <button class="btn btn-secondary" onclick="ping(1)">Ping</button>
+                    <button class="btn btn-secondary" onclick="requestSnapshot(1)">Snapshot</button>
+                </div>
+                <div class="client-stats">
+                    <span>Version: <span id="version1">0</span></span>
+                    <span>Pending: <span id="pending1">0</span></span>
+                    <span>Messages: <span id="msgCount1">0</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Client 2 -->
+        <div class="client" id="client2">
+            <div class="client-header">
+                <div class="client-title">Client 2</div>
+                <div class="client-config">
+                    <label>Doc:</label>
+                    <input type="text" id="docId2" value="test-doc-1" placeholder="Document ID">
+                    <label>Server:</label>
+                    <select id="serverHint2">
+                        <option value="">Auto (Load Balanced)</option>
+                        <option value="app1">Force app1</option>
+                        <option value="app2">Force app2</option>
+                        <option value="app3">Force app3</option>
+                    </select>
+                </div>
+            </div>
+            <div class="status-bar status-disconnected" id="status2">
+                <span>Status: Disconnected</span>
+                <span class="server-info" id="serverInfo2">Server: None</span>
+            </div>
+            <div class="client-content">
+                <textarea class="editor" id="editor2" placeholder="Client 2: Start typing to test collaboration..."></textarea>
+                <div class="client-controls">
+                    <button class="btn" onclick="connect(2)">Connect</button>
+                    <button class="btn btn-secondary" onclick="disconnect(2)">Disconnect</button>
+                    <button class="btn btn-secondary" onclick="ping(2)">Ping</button>
+                    <button class="btn btn-secondary" onclick="requestSnapshot(2)">Snapshot</button>
+                </div>
+                <div class="client-stats">
+                    <span>Version: <span id="version2">0</span></span>
+                    <span>Pending: <span id="pending2">0</span></span>
+                    <span>Messages: <span id="msgCount2">0</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Client 3 -->
+        <div class="client" id="client3">
+            <div class="client-header">
+                <div class="client-title">Client 3</div>
+                <div class="client-config">
+                    <label>Doc:</label>
+                    <input type="text" id="docId3" value="test-doc-2" placeholder="Document ID">
+                    <label>Server:</label>
+                    <select id="serverHint3">
+                        <option value="">Auto (Load Balanced)</option>
+                        <option value="app1">Force app1</option>
+                        <option value="app2">Force app2</option>
+                        <option value="app3">Force app3</option>
+                    </select>
+                </div>
+            </div>
+            <div class="status-bar status-disconnected" id="status3">
+                <span>Status: Disconnected</span>
+                <span class="server-info" id="serverInfo3">Server: None</span>
+            </div>
+            <div class="client-content">
+                <textarea class="editor" id="editor3" placeholder="Client 3: Start typing to test collaboration..."></textarea>
+                <div class="client-controls">
+                    <button class="btn" onclick="connect(3)">Connect</button>
+                    <button class="btn btn-secondary" onclick="disconnect(3)">Disconnect</button>
+                    <button class="btn btn-secondary" onclick="ping(3)">Ping</button>
+                    <button class="btn btn-secondary" onclick="requestSnapshot(3)">Snapshot</button>
+                </div>
+                <div class="client-stats">
+                    <span>Version: <span id="version3">0</span></span>
+                    <span>Pending: <span id="pending3">0</span></span>
+                    <span>Messages: <span id="msgCount3">0</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Client 4 -->
+        <div class="client" id="client4">
+            <div class="client-header">
+                <div class="client-title">Client 4</div>
+                <div class="client-config">
+                    <label>Doc:</label>
+                    <input type="text" id="docId4" value="test-doc-2" placeholder="Document ID">
+                    <label>Server:</label>
+                    <select id="serverHint4">
+                        <option value="">Auto (Load Balanced)</option>
+                        <option value="app1">Force app1</option>
+                        <option value="app2">Force app2</option>
+                        <option value="app3">Force app3</option>
+                    </select>
+                </div>
+            </div>
+            <div class="status-bar status-disconnected" id="status4">
+                <span>Status: Disconnected</span>
+                <span class="server-info" id="serverInfo4">Server: None</span>
+            </div>
+            <div class="client-content">
+                <textarea class="editor" id="editor4" placeholder="Client 4: Start typing to test collaboration..."></textarea>
+                <div class="client-controls">
+                    <button class="btn" onclick="connect(4)">Connect</button>
+                    <button class="btn btn-secondary" onclick="disconnect(4)">Disconnect</button>
+                    <button class="btn btn-secondary" onclick="ping(4)">Ping</button>
+                    <button class="btn btn-secondary" onclick="requestSnapshot(4)">Snapshot</button>
+                </div>
+                <div class="client-stats">
+                    <span>Version: <span id="version4">0</span></span>
+                    <span>Pending: <span id="pending4">0</span></span>
+                    <span>Messages: <span id="msgCount4">0</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="log-container">
+        <div class="log-header">
+            <div><strong>System Log</strong> - Real-time events from all clients</div>
+            <div>
+                <button class="btn btn-secondary" onclick="clearLog()">Clear</button>
+                <label style="margin-left: 10px;">
+                    <input type="checkbox" id="autoScroll" checked> Auto-scroll
+                </label>
+            </div>
+        </div>
+        <div class="log" id="systemLog"></div>
+    </div>
+
+    <script>
+        // Client state management
+        const clients = {
+            1: { ws: null, serverVersion: 0, pendingOps: [], msgCount: 0, debounceTimer: null, sequenceNum: 0, detectedServer: null },
+            2: { ws: null, serverVersion: 0, pendingOps: [], msgCount: 0, debounceTimer: null, sequenceNum: 0, detectedServer: null },
+            3: { ws: null, serverVersion: 0, pendingOps: [], msgCount: 0, debounceTimer: null, sequenceNum: 0, detectedServer: null },
+            4: { ws: null, serverVersion: 0, pendingOps: [], msgCount: 0, debounceTimer: null, sequenceNum: 0, detectedServer: null }
+        };
+
+        function log(message, type = 'info', clientId = null) {
+            const logDiv = document.getElementById('systemLog');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            
+            const clientPrefix = clientId ? `[Client ${clientId}] ` : '[System] ';
+            entry.innerHTML = `<strong>${time}</strong> ${clientPrefix}${message}`;
+            
+            logDiv.appendChild(entry);
+            
+            if (document.getElementById('autoScroll').checked) {
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+        }
+
+        function updateStatus(clientId, status, serverInfo = '') {
+            const statusDiv = document.getElementById(`status${clientId}`);
+            const serverInfoSpan = document.getElementById(`serverInfo${clientId}`);
+            
+            statusDiv.className = `status-bar status-${status}`;
+            
+            let statusText = '';
+            switch(status) {
+                case 'connected':
+                    statusText = 'Status: Connected';
+                    break;
+                case 'connecting':
+                    statusText = 'Status: Connecting...';
+                    break;
+                case 'disconnected':
+                default:
+                    statusText = 'Status: Disconnected';
+                    serverInfo = 'None';
+                    break;
+            }
+            
+            statusDiv.querySelector('span').textContent = statusText;
+            serverInfoSpan.textContent = `Server: ${serverInfo}`;
+        }
+
+        function updateStats(clientId) {
+            const client = clients[clientId];
+            document.getElementById(`version${clientId}`).textContent = client.serverVersion;
+            document.getElementById(`pending${clientId}`).textContent = client.pendingOps.length;
+            document.getElementById(`msgCount${clientId}`).textContent = client.msgCount;
+        }
+
+        function connect(clientId) {
+            const client = clients[clientId];
+            if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+                log('Already connected', 'warning', clientId);
+                return;
+            }
+
+            const docId = document.getElementById(`docId${clientId}`).value || `test-doc-${clientId}`;
+            const serverHint = document.getElementById(`serverHint${clientId}`).value;
+            
+            let wsUrl = `ws://localhost:80/ws?docId=${encodeURIComponent(docId)}`;
+            if (serverHint) {
+                wsUrl += `&server=${serverHint}`;
+            }
+
+            log(`Connecting to: ${wsUrl}`, 'info', clientId);
+            updateStatus(clientId, 'connecting');
+            client.detectedServer = null; // Reset server detection for new connection
+
+            try {
+                client.ws = new WebSocket(wsUrl);
+
+                client.ws.onopen = function(event) {
+                    log('✅ Connection established', 'success', clientId);
+                    updateStatus(clientId, 'connected', 'Detecting...');
+                    client.msgCount = 0;
+                    
+                    // Request snapshot
+                    const snapshotRequest = {
+                        type: 'snapshot_request',
+                        docId: docId,
+                        clientId: `client-${clientId}`
+                    };
+                    client.ws.send(JSON.stringify(snapshotRequest));
+                    log('📄 Snapshot requested', 'info', clientId);
+                    
+                    // Send any pending operations
+                    if (client.pendingOps.length > 0) {
+                        log(`📤 Sending ${client.pendingOps.length} pending operations`, 'info', clientId);
+                        client.pendingOps.forEach(op => {
+                            client.ws.send(JSON.stringify(op));
+                        });
+                    }
+                    
+                    updateStats(clientId);
+                };
+
+                client.ws.onmessage = function(event) {
+                    client.msgCount++;
+                    log(`📨 Received: ${event.data.substring(0, 100)}${event.data.length > 100 ? '...' : ''}`, 'success', clientId);
+                    
+                    try {
+                        const msg = JSON.parse(event.data);
+                        
+                        // Update server info only if we haven't detected it yet or it changed
+                        if (msg.serverId && (!client.detectedServer || client.detectedServer !== msg.serverId)) {
+                            client.detectedServer = msg.serverId;
+                            updateStatus(clientId, 'connected', msg.serverId);
+                            log(`🖥️ Server detected: ${msg.serverId}`, 'info', clientId);
+                        } else if (!client.detectedServer && (msg.serverVersion || msg.version)) {
+                            // If no serverId but we got a response, update to show connection (only once)
+                            client.detectedServer = 'app[unknown]';
+                            updateStatus(clientId, 'connected', 'app[unknown]');
+                            log(`🖥️ Server detected: app[unknown]`, 'info', clientId);
+                        }
+                        
+                        if (msg.type === 'snapshot') {
+                            const editor = document.getElementById(`editor${clientId}`);
+                            // Prevent recursive updates
+                            if (editor.value !== (msg.text || '')) {
+                                editor.value = msg.text || '';
+                                client.serverVersion = msg.version || 0;
+                                log(`📄 Snapshot applied: version=${client.serverVersion}, length=${msg.text ? msg.text.length : 0}`, 'info', clientId);
+                            }
+                        } else if (msg.type === 'pong') {
+                            log('🏓 Pong received', 'success', clientId);
+                        } else if (msg.opId) {
+                            // Remove confirmed operation from pending
+                            const wasOurOp = client.pendingOps.some(op => op.opId === msg.opId);
+                            client.pendingOps = client.pendingOps.filter(op => op.opId !== msg.opId);
+                            
+                            if (wasOurOp) {
+                                log(`✅ Our edit confirmed: ${msg.opId}`, 'success', clientId);
+                            } else {
+                                // Apply remote changes if not our own operation
+                                const incomingVersion = msg.version || msg.serverVersion || 0;
+                                if (msg.text !== undefined) {
+                                    const editor = document.getElementById(`editor${clientId}`);
+                                    // Prevent applying changes while user is typing
+                                    if (document.activeElement !== editor && editor.value !== msg.text) {
+                                        editor.value = msg.text;
+                                        client.serverVersion = Math.max(client.serverVersion, incomingVersion);
+                                        log(`📝 Remote edit applied: version=${incomingVersion}, from=${msg.origin || 'unknown'}`, 'success', clientId);
+                                    } else if (incomingVersion > client.serverVersion) {
+                                        client.serverVersion = incomingVersion;
+                                        log(`📊 Version updated: ${incomingVersion} (editor active, text not changed)`, 'info', clientId);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        updateStats(clientId);
+                    } catch (e) {
+                        log(`⚠️ Parse error: ${e.message}`, 'error', clientId);
+                    }
+                };
+
+                client.ws.onclose = function(event) {
+                    log(`❌ Connection closed: ${event.code} - ${event.reason}`, 'error', clientId);
+                    updateStatus(clientId, 'disconnected');
+                    client.ws = null;
+                    client.detectedServer = null; // Reset server detection
+                    updateStats(clientId);
+                    
+                    // Auto-reconnect after 3 seconds if not manually disconnected
+                    if (event.code !== 1000) {
+                        setTimeout(() => {
+                            if (!client.ws) {
+                                log('🔄 Auto-reconnecting...', 'info', clientId);
+                                connect(clientId);
+                            }
+                        }, 3000);
+                    }
+                };
+
+                client.ws.onerror = function(event) {
+                    log('💥 WebSocket error occurred', 'error', clientId);
+                    updateStatus(clientId, 'disconnected');
+                };
+
+            } catch (error) {
+                log(`💥 Failed to create WebSocket: ${error.message}`, 'error', clientId);
+                updateStatus(clientId, 'disconnected');
+            }
+        }
+
+        function disconnect(clientId) {
+            const client = clients[clientId];
+            if (client.ws) {
+                client.ws.close(1000, 'Manual disconnect');
+                log('🔌 Disconnection requested', 'info', clientId);
+            } else {
+                log('No active connection to disconnect', 'warning', clientId);
+            }
+        }
+
+        function ping(clientId) {
+            const client = clients[clientId];
+            if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+                const docId = document.getElementById(`docId${clientId}`).value;
+                const ping = {
+                    type: 'ping',
+                    docId: docId,
+                    clientId: `client-${clientId}`,
+                    timestamp: Date.now()
+                };
+                client.ws.send(JSON.stringify(ping));
+                log('🏓 Ping sent', 'info', clientId);
+            } else {
+                log('Cannot ping - not connected', 'warning', clientId);
+            }
+        }
+
+        function requestSnapshot(clientId) {
+            const client = clients[clientId];
+            if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+                const docId = document.getElementById(`docId${clientId}`).value;
+                const request = {
+                    type: 'snapshot_request',
+                    docId: docId,
+                    clientId: `client-${clientId}`
+                };
+                client.ws.send(JSON.stringify(request));
+                log('📄 Snapshot requested', 'info', clientId);
+            } else {
+                log('Cannot request snapshot - not connected', 'warning', clientId);
+            }
+        }
+
+        function sendEdit(clientId, text) {
+            const client = clients[clientId];
+            const docId = document.getElementById(`docId${clientId}`).value;
+            
+            client.sequenceNum++;
+            const op = {
+                type: 'edit',
+                opId: `client${clientId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                sequence: client.sequenceNum,
+                origin: `client-${clientId}`,
+                docId: docId,
+                text: text,
+                version: client.serverVersion + 1,
+                timestamp: Date.now()
+            };
+            
+            client.pendingOps.push(op);
+            
+            if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+                client.ws.send(JSON.stringify(op));
+                log(`📤 Edit sent: ${text.length} chars, v${op.version}`, 'info', clientId);
+            } else {
+                log('📋 Edit queued (not connected)', 'warning', clientId);
+            }
+            
+            updateStats(clientId);
+        }
+
+        // Global functions
+        function connectAll() {
+            for (let i = 1; i <= 4; i++) {
+                connect(i);
+            }
+            log('🌐 Connecting all clients', 'info');
+        }
+
+        function disconnectAll() {
+            for (let i = 1; i <= 4; i++) {
+                disconnect(i);
+            }
+            log('🔌 Disconnecting all clients', 'info');
+        }
+
+        function clearLog() {
+            document.getElementById('systemLog').innerHTML = '';
+        }
+
+        function clearAllLogs() {
+            clearLog();
+            log('🧹 Logs cleared', 'info');
+        }
+
+        function testConnection() {
+            log('🔍 Testing backend connectivity...', 'info');
+            
+            // Test basic HTTP connectivity to nginx
+            fetch('http://localhost:80/')
+                .then(response => {
+                    log(`✅ HTTP connection to nginx: ${response.status}`, 'success');
+                    return response.text();
+                })
+                .then(data => {
+                    log(`📄 Nginx response length: ${data.length} chars`, 'info');
+                })
+                .catch(error => {
+                    log(`❌ HTTP connection failed: ${error.message}`, 'error');
+                });
+
+            // Test WebSocket connectivity
+            const testWs = new WebSocket('ws://localhost:80/ws?docId=connection-test');
+            
+            testWs.onopen = () => {
+                log('✅ WebSocket test connection successful', 'success');
+                testWs.close();
+            };
+            
+            testWs.onerror = (error) => {
+                log(`❌ WebSocket test failed: ${error}`, 'error');
+            };
+            
+            testWs.onclose = (event) => {
+                if (event.code === 1000) {
+                    log('✅ WebSocket test completed successfully', 'success');
+                } else {
+                    log(`⚠️ WebSocket test closed with code: ${event.code}`, 'warning');
+                }
+            };
+        }
+
+        // Editor event handlers
+        for (let i = 1; i <= 4; i++) {
+            const editor = document.getElementById(`editor${i}`);
+            
+            editor.addEventListener('input', function(e) {
+                if (!document.getElementById('autoSync').checked) return;
+                
+                const client = clients[i];
+                const debounceMs = parseInt(document.getElementById('debounceMs').value) || 300;
+                
+                clearTimeout(client.debounceTimer);
+                client.debounceTimer = setTimeout(() => {
+                    // Only send if connected
+                    if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+                        sendEdit(i, e.target.value);
+                    } else {
+                        log(`⚠️ Cannot send edit - not connected`, 'warning', i);
+                    }
+                }, debounceMs);
+            });
+
+            // Add focus/blur handlers for better UX
+            editor.addEventListener('focus', function() {
+                log(`📝 Editor ${i} focused`, 'info', i);
+            });
+
+            editor.addEventListener('blur', function() {
+                log(`📝 Editor ${i} blurred`, 'info', i);
+                // Force send any pending changes
+                const client = clients[i];
+                if (client.debounceTimer) {
+                    clearTimeout(client.debounceTimer);
+                    if (client.ws && client.ws.readyState === WebSocket.OPEN) {
+                        sendEdit(i, this.value);
+                    }
+                }
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🌐 Multi-client test interface loaded', 'info');
+            log('💡 Tips: Use different docIds to test different documents, same docIds for collaboration', 'info');
+            log('💡 Server hints can force connections to specific backend instances', 'info');
+        });
+    </script>
+</body>
+</html>

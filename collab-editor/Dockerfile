@@ -4,9 +4,10 @@ WORKDIR /workspace
 
 # copy maven metadata first to utilize docker cache
 COPY pom.xml .
-# if you have settings.xml or .m2 settings, copy them here
-# COPY settings.xml /root/.m2/settings.xml
+# Download dependencies first (better caching)
+RUN mvn dependency:go-offline -B
 
+# Then copy source and build
 COPY src ./src
 RUN mvn -B -DskipTests package
 

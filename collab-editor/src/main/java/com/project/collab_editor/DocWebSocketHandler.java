@@ -5,9 +5,12 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +48,7 @@ public class DocWebSocketHandler extends TextWebSocketHandler {
     private final ConcurrentHashMap<String, Set<WebSocketSession>> docSessions = new ConcurrentHashMap<>();
     // docId -> state
     private final ConcurrentHashMap<String, DocumentState> docStates = new ConcurrentHashMap<>();
+    private final ExecutorService persistenceExecutor = Executors.newFixedThreadPool(4);
 
     private final RedisPublisher redisPublisher;
     private final StringRedisTemplate redisTemplate;
@@ -84,13 +88,17 @@ public class DocWebSocketHandler extends TextWebSocketHandler {
             return loaded != null ? loaded : new DocumentState("", 0L);
         });
 
-        // send snapshot to newly connected client
+        // send snapshot to newly connected client (thread-safe)
         try {
             ObjectNode envelope = mapper.createObjectNode();
             envelope.put("type", "snapshot");
             envelope.put("version", ds.version);
             envelope.put("text", ds.text);
-            session.sendMessage(new TextMessage(envelope.toString()));
+            envelope.put("serverId", serverId); // Include server ID
+            
+            synchronized (session) {
+                session.sendMessage(new TextMessage(envelope.toString()));
+            }
         } catch (IOException e) {
             logger.warn("Failed to send snapshot to session {}: {}", session.getId(), e.getMessage());
         }
@@ -137,40 +145,50 @@ public class DocWebSocketHandler extends TextWebSocketHandler {
                 if (current == null)
                     current = new DocumentState("", 0L);
 
-                long newVersion = incomingVersion >= 0 ? incomingVersion : current.version + 1;
+                // Use server-side monotonic versioning to prevent race conditions
+                long newVersion = Math.max(current.version + 1, incomingVersion + 1);
 
-                // version guard: ignore if incomingVersion < current.version
+                // Always apply the operation but log potential conflicts
                 if (incomingVersion >= 0 && incomingVersion < current.version) {
-                    logger.warn("Ignoring stale op for doc {}: incomingVersion={} currentVersion={}", docId,
-                            incomingVersion, current.version);
-                    return;
+                    logger.warn("Applying potentially conflicting op for doc {}: incomingVersion={} currentVersion={} newVersion={}", 
+                            docId, incomingVersion, current.version, newVersion);
                 }
 
                 String newText = incomingText != null ? incomingText : current.text;
                 DocumentState newDs = new DocumentState(newText, newVersion);
                 docStates.put(docId, newDs);
 
-                // broadcast locally (send original payload so client sees same message)
-                broadcastToLocalSessions(docId, payload);
-
-                // persist snapshot asynchronously (non-blocking)
-                persistSnapshotAsync(docId, newDs);
-
-                // publish to Redis so other servers can pick it up
+                // publish to Redis FIRST to ensure ordering
                 ObjectNode out = mapper.createObjectNode();
                 out.put("serverId", serverId);
                 out.put("docId", docId);
                 out.put("type", "op");
+                out.put("serverVersion", newDs.version); // Add server version
                 out.set("payload", msg);
                 try {
                     redisPublisher.publish(docId, out.toString());
                 } catch (Exception e) {
                     logger.warn("Failed to publish to redis for doc {}: {}", docId, e.getMessage(), e);
                 }
+
+                // broadcast locally AFTER Redis to maintain order
+                // Enhance the message with server info for local broadcast
+                ObjectNode enhancedMsg = mapper.createObjectNode();
+                enhancedMsg.put("serverId", serverId);
+                enhancedMsg.put("serverVersion", newDs.version);
+                enhancedMsg.setAll((ObjectNode) msg);
+                broadcastToLocalSessions(docId, enhancedMsg.toString());
+
+                // persist snapshot asynchronously (non-blocking)
+                persistSnapshotAsync(docId, newDs);
             } else if ("ping".equals(type)) {
                 ObjectNode reply = mapper.createObjectNode();
                 reply.put("type", "pong");
-                session.sendMessage(new TextMessage(reply.toString()));
+                reply.put("serverId", serverId); // Include server ID in pong
+                reply.put("timestamp", System.currentTimeMillis());
+                synchronized (session) {
+                    session.sendMessage(new TextMessage(reply.toString()));
+                }
             } else {
                 // unknown types: broadcast to local sessions
                 broadcastToLocalSessions(docId, payload);
@@ -194,17 +212,22 @@ public class DocWebSocketHandler extends TextWebSocketHandler {
 
             String incomingText = inner.has("text") ? inner.get("text").asText() : null;
             long incomingVersion = inner.has("version") ? inner.get("version").asLong() : -1L;
+            long serverVersion = node.has("serverVersion") ? node.get("serverVersion").asLong() : -1L;
 
             DocumentState current = docStates.get(docId);
             if (current == null)
                 current = new DocumentState("", 0L);
 
-            long newVersion = incomingVersion >= 0 ? incomingVersion : current.version + 1;
+            // Use server version if available, otherwise use monotonic increment
+            long newVersion = serverVersion > 0 ? serverVersion : Math.max(current.version + 1, incomingVersion + 1);
 
-            // version guard: only apply if incoming version is newer
-            if (incomingVersion >= 0 && incomingVersion <= current.version) {
-                logger.debug("Ignoring redis op that is not newer: doc={} incoming={} current={}", docId,
-                        incomingVersion, current.version);
+            // Apply operation if server version is newer, or if no server version but client version is newer
+            boolean shouldApply = (serverVersion > 0 && serverVersion > current.version) ||
+                                (serverVersion <= 0 && incomingVersion > current.version);
+            
+            if (!shouldApply) {
+                logger.debug("Ignoring redis op: doc={} serverVersion={} incomingVersion={} currentVersion={}", 
+                        docId, serverVersion, incomingVersion, current.version);
                 return;
             }
 
@@ -215,27 +238,49 @@ public class DocWebSocketHandler extends TextWebSocketHandler {
             // persist snapshot (async)
             persistSnapshotAsync(docId, newDs);
 
-            // broadcast to local sessions (send the inner payload)
-            broadcastToLocalSessions(docId, inner.toString());
+            // broadcast to local sessions (enhance the inner payload with server info)
+            try {
+                ObjectNode enhancedMsg = (ObjectNode) inner.deepCopy();
+                enhancedMsg.put("serverId", originServer);
+                enhancedMsg.put("serverVersion", newVersion);
+                broadcastToLocalSessions(docId, enhancedMsg.toString());
+            } catch (Exception ex) {
+                logger.debug("Failed to enhance cross-server message, using original: {}", ex.getMessage());
+                broadcastToLocalSessions(docId, inner.toString());
+            }
         } catch (Exception e) {
             logger.warn("Failed to process redis message for doc {}: {}", docId, e.getMessage(), e);
         }
     }
 
-    // helper - send payload string to all sessions for docId
+    // helper - send payload string to all sessions for docId (thread-safe)
     private void broadcastToLocalSessions(String docId, String payload) {
         Set<WebSocketSession> sessions = docSessions.getOrDefault(docId, Collections.emptySet());
-        for (WebSocketSession s : sessions) {
-            if (!s.isOpen())
+        // Create a copy to avoid concurrent modification during iteration
+        Set<WebSocketSession> sessionsCopy = new HashSet<>(sessions);
+        
+        for (WebSocketSession s : sessionsCopy) {
+            if (!s.isOpen()) {
+                // Clean up closed sessions
+                sessions.remove(s);
                 continue;
-            try {
-                s.sendMessage(new TextMessage(payload));
-            } catch (IOException e) {
-                logger.warn("Failed to send message to session {}: {}, closing session", s.getId(), e.getMessage());
+            }
+            
+            // Use synchronization to prevent concurrent writes to the same session
+            synchronized (s) {
                 try {
-                    s.close(CloseStatus.SERVER_ERROR);
-                } catch (IOException ex) {
-                    // ignore
+                    s.sendMessage(new TextMessage(payload));
+                } catch (IOException e) {
+                    logger.warn("Failed to send message to session {}: {}, closing session", s.getId(), e.getMessage());
+                    try {
+                        s.close(CloseStatus.SERVER_ERROR);
+                        sessions.remove(s);
+                    } catch (IOException ex) {
+                        // ignore
+                    }
+                } catch (IllegalStateException e) {
+                    logger.warn("WebSocket in invalid state for session {}: {}", s.getId(), e.getMessage());
+                    // Don't close session for state issues, they might recover
                 }
             }
         }
@@ -268,8 +313,9 @@ public class DocWebSocketHandler extends TextWebSocketHandler {
     }
 
     // async persist helper - use a bounded executor in production
+    
     private void persistSnapshotAsync(String docId, DocumentState ds) {
-        CompletableFuture.runAsync(() -> persistSnapshot(docId, ds));
+        persistenceExecutor.submit(() -> persistSnapshot(docId, ds));
     }
 
     // synchronous persist (wrapped by async helper)

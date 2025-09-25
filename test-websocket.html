@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Connection Test</h1>
+    <div id="status">Disconnected</div>
+    <div id="messages"></div>
+    
+    <script>
+        // Test WebSocket connection to the backend
+        const docId = 'test1';
+        const wsUrl = `ws://localhost:80/ws?docId=${encodeURIComponent(docId)}`;
+        console.log('Connecting to:', wsUrl);
+        
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        
+        function addMessage(msg) {
+            const div = document.createElement('div');
+            div.textContent = `${new Date().toISOString()}: ${msg}`;
+            messagesDiv.appendChild(div);
+        }
+        
+        const ws = new WebSocket(wsUrl);
+        
+        ws.onopen = () => {
+            statusDiv.textContent = 'Connected';
+            addMessage('WebSocket connected');
+            
+            // Request snapshot
+            const snapshotRequest = { type: "snapshot_request", docId };
+            ws.send(JSON.stringify(snapshotRequest));
+            addMessage('Sent snapshot request');
+        };
+        
+        ws.onmessage = (evt) => {
+            addMessage(`Received: ${evt.data}`);
+        };
+        
+        ws.onclose = (evt) => {
+            statusDiv.textContent = 'Disconnected';
+            addMessage(`Connection closed: ${evt.code} ${evt.reason}`);
+        };
+        
+        ws.onerror = (evt) => {
+            statusDiv.textContent = 'Error';
+            addMessage(`WebSocket error: ${evt}`);
+        };
+        
+        // Send a test message after 2 seconds
+        setTimeout(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                const testMsg = {
+                    type: "edit",
+                    opId: "test-" + Date.now(),
+                    origin: "test",
+                    docId: docId,
+                    text: "Hello from test client!",
+                    version: Date.now()
+                };
+                ws.send(JSON.stringify(testMsg));
+                addMessage('Sent test message');
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
